@@ -1,5 +1,5 @@
 # coordination20
-Welcome to our repository, presening the property verification and testing examples from coordination 2020 paper,
+Welcome to our repository, presenting the property verification and testing examples from coordination 2020 paper,
 Towards a Formally Verified EVM in Production Environment.
 
 ## This Repository
