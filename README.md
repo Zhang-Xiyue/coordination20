@@ -14,3 +14,13 @@ This directory includes
 1. simple_auction.mlw, which presents the specification of Open Auction contract. The general idea of the simple auction contract is that everyone can send their bids when the bidding is not over. If a higher bid is raised compared with the current recorded highestBid, the previously highest bidder will get their money back through withdrawl. After the end of the bidding, the beneficiary will claim the money.
 2. simple_auction directory. You can check the why3 session information through `why3 session info [options] <session directory>` for various informations
 about the session, e.g., proof statistics. 
+
+### test_vm
+
+This directory includes
+
+1. The Why3 runnable specification of the EVM, and a set of Why3 libraries, drivers, etc. to support the verification and code generation.
+
+2. The generated OCaml code fragment `evm.ml` and the glue code `server.ml` (making it able to integrate the EVM implementation into the EVM host in Rust.
+
+3. A guide of downloading the patched Rust EVM and running the selected tests in *vmArithmeticTest*.
