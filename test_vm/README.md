@@ -1,6 +1,6 @@
-# EVM-Why3
+# test_vm
 
-EVM in Why3 from a state transition perspective
+This is the guide of reproducing the tests of EVM in OCaml (extracted from Why3).
 
 ## how to build
 
@@ -18,7 +18,7 @@ to install opam and initialize it.
 
 For the users who have already installed and properly configured *opam*, use
 ```
-$ opam install why3 ocamlfind
+$ opam install why3 ocamlfind yojson
 ```
 to install the Why3 [Automated Theorem Prover](http://why3.lri.fr/).
 
@@ -27,11 +27,23 @@ runs as a RPC server (for now not implemented yet).
 
 ## running tests
 
-Simply using:
+First make sure that this repository is cloned and the executable *server* is properly built by
 
 ```
-$ make test
-$ ./test
+$ cd <test_vm>
+$ make server
 ```
 
-will compile and run the test cases (*to be added*).
+clone the modified version of cita-vm at [Cita-VM](https://github.com/liyi-david/cita-vm). And running
+
+```
+$ cd <Cita-VM>
+$ git submodule init && git submodule update
+$ export WHY3EVM=<test_vm>
+$ cargo build
+$ cargo test
+```
+will show the test result.
+
+
+will compile and run the selected test cases in *vmArithmeticTest*.
