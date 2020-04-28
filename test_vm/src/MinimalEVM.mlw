@@ -1,7 +1,42 @@
+module UInt8
+	use mach.int.Unsigned
+	type uint8
+	constant max_uint8: int = 0xff
+	clone export mach.int.Unsigned with
+		type t = uint8,
+		constant max = max_uint8
+end
+
+module UInt4
+	use mach.int.Unsigned
+	type uint4
+	constant max_uint4: int = 0xf
+	clone export mach.int.Unsigned with
+		type t = uint4,
+		constant max = max_uint4
+end
+
+module UInt160
+	use mach.int.Unsigned
+	type uint160
+	constant max_uint160: int = 0xffffffffffffffffffffffffffffffffffffffff
+	clone export mach.int.Unsigned with
+		type t = uint160,
+		constant max = max_uint160
+end
+
+module UInt256
+	use mach.int.Unsigned
+	type uint256
+	constant max_uint256: int = 0xffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff_ffff
+	clone export mach.int.Unsigned with
+		type t = uint256,
+		constant max = max_uint256
+end
+
 module EVM
 
-(* Focus on machine state: Program Counter, Gas Available, Stack Contents, Memory Contents which are volatile Machine state;
-with the account storage as persistent world state *)
+(* Focus on machine state transition: Program Counter, Stack Contents, Memory Contents, Storage, etc. *)
 
 (* the library support *)
 use array.Array
@@ -11,41 +46,40 @@ use list.ListRich (* combo theory that includes all list operations like length,
 use option.Option
 use map.Map
 use int.EuclideanDivision
-use uint256.UInt256
-use uint160.UInt160
-use uint8.UInt8
-use uint4.UInt4
+use UInt256
+use UInt160
+use UInt8
+use UInt4
 
 
 (* Use clear alias for commonly-used type *)
 
 
-(* 32-bit and 64-bit signed and unsigned integers ([Int32], [UInt32], [Int64], and [UInt64]) as well as 31-bit and 
-63-bit signed integers ([Int31] and [Int63] have been instantiated *)
+(* 8-bit and 160-bit unsigned integers ([UInt8] and [UInt160]) *)
 (* They can be transformed using to_int and of_int, which can be further encapsulated for other transformation between type *) 
+(* Explicit type transformation, such as machword to address, machword to byte in each newly-built library,
+will be encapsulated as a function through to_int and of_int *)
 type byte = uint8
 type address = uint160
 type machword = uint256
-
-type storage = map address machword
-
-(* Explicit type transformation, such as machword to address, machword to byte in each newly-built library,
-can be encapsulated as a function through to_int and of_int*)
-
 (* memory: word addressed byte array *)
-(* stack: one way of model is modeled as list uint256, with a maximum size of 1024 *)
-(* storage(independent): word addressed word array, maintained as part of the system state *)
+(* stack: list uint256 *)
+(* storage: word addressed word array, maintained as part of the system state *)
+
+(* Enumeration type*)
+(* Both machword and byte can be saved to memory *)
+(* type storage = map address machword *)
 
 (* Enumeration type*)
 type memory_content = 
    | Item8 uint256
    | Item256 uint256
-
-type memory = machword -> option memory_content
+type memory = map machword (option memory_content)
 type stack = list uint256
+type storage = map machword machword
 
-(* EVM status *)
-(* TODO *)
+(* VM status *)
+
 
 type error =
     | OutOfBounds
@@ -65,38 +99,11 @@ type vmstatus =
   | Error error
   | Finish return_type
 
-(* EVM Operations *)
+(* EVM instructions *)
 
-(* Record the number of items required on the stack and returned to the stack for a given operation *)
+(* Record the number of items required on the stack and returned to the stack for a given instruction *)
 type st_num = (int, int)
 
-
-(* Signed Arithmetics *)
-type sign_arith_inst =
-| SDIV
-| SMOD
-| SLT
-| SGT
-| SIGNEXTEND (* Extend length of two's complement signed integer *)
-
-let sign_arith_inst_opcode (inst: sign_arith_inst): int =
-match inst with 
-| SDIV -> 0X05 (*  Signed integer division operation (truncated) *)
-| SMOD -> 0X07
-| SLT -> 0X12
-| SGT -> 0X13
-| SIGNEXTEND -> 0X0b 
-end   
-
-let sign_arith_inst_num (inst: sign_arith_inst): st_num =
-match inst with 
-| SDIV -> (2, 1)
-| SMOD -> (2, 1)
-| SLT -> (2, 1)
-| SGT -> (2, 1)
-| SIGNEXTEND -> (2, 1)
-end   
-          
 (* Unsigned Arithmetics *)
 type arith_inst =
 | ADD
@@ -146,6 +153,33 @@ match inst with
 | ISZERO -> (1, 1)
 | SHA3 -> (2, 1)
 end
+(* Signed Arithmetics *)
+type sign_arith_inst =
+| SDIV
+| SMOD
+| SLT
+| SGT
+| SIGNEXTEND (* Extend length of two's complement signed integer *)
+
+let sign_arith_inst_opcode (inst: sign_arith_inst): int =
+match inst with 
+| SDIV -> 0X05 (*  Signed integer division operation (truncated) *)
+| SMOD -> 0X07
+| SLT -> 0X12
+| SGT -> 0X13
+| SIGNEXTEND -> 0X0b 
+end   
+
+let sign_arith_inst_num (inst: sign_arith_inst): st_num =
+match inst with 
+| SDIV -> (2, 1)
+| SMOD -> (2, 1)
+| SLT -> (2, 1)
+| SGT -> (2, 1)
+| SIGNEXTEND -> (2, 1)
+end   
+          
+
 
 (* Bits *)
 type bits_inst =
@@ -243,9 +277,9 @@ end
 
 (* Memory Operations *)
 type memory_inst =
-| MLOAD 
-| MSTORE 
-| MSTORE8 
+| MLOAD (* Load word from memory *)
+| MSTORE (* Save word to memory *)
+| MSTORE8 (* Save byte to memory *)
 | MSIZE (* the size of the currently used part of the memory *)
 | CALLDATACOPY (* copy the caller's data to the memory *)
 | CODECOPY (* copy part of the currently running code to the memory *)
@@ -253,13 +287,13 @@ type memory_inst =
 
 let memory_inst_opcode (inst: memory_inst) : int =
 match inst with 
-| MLOAD -> 0X51 (* Load word from memory *)
-| MSTORE -> 0X52 (* Save word to memory *)
-| MSTORE8 -> 0X53 (* Save byte to memory *)
-| MSIZE -> 0X59 (* the size of the currently used part of the memory *)
-| CALLDATACOPY -> 0X37 (* copy the caller's data to the memory *)
-| CODECOPY -> 0X39(* copy part of the currently running code to the memory *)
-| EXTCODECOPY -> 0X3c(* copy part of the code of a specified account *)
+| MLOAD -> 0X51 
+| MSTORE -> 0X52 
+| MSTORE8 -> 0X53 
+| MSIZE -> 0X59 
+| CALLDATACOPY -> 0X37 
+| CODECOPY -> 0X39
+| EXTCODECOPY -> 0X3c
 end
 
 let memory_inst_num (inst: memory_inst) : st_num =
@@ -267,11 +301,12 @@ match inst with
 | MLOAD -> (1, 1) 
 | MSTORE -> (2, 0) 
 | MSTORE8 -> (2, 0) 
-| MSIZE -> (0, 1)(* Copy code running in current environment to memory *)
-| CALLDATACOPY -> (3, 0) (* copy the caller's data to the memory *)
-| CODECOPY -> (3, 0)(* copy part of the currently running code to the memory *)
-| EXTCODECOPY -> (4, 0)(* copy part of the code of a specified account *)
+| MSIZE -> (0, 1)
+| CALLDATACOPY -> (3, 0) 
+| CODECOPY -> (3, 0)
+| EXTCODECOPY -> (4, 0)
 end
+
 
 
 (* Storage Operations *)
@@ -281,14 +316,14 @@ type storage_inst =
 
 let storage_inst_opcode (inst: storage_inst): int = 
 match inst with 
-| SLOAD -> 0X54 (*Load word from the storage *)
-| SSTORE -> 0X55 (* Save word to the storage *)
+| SLOAD -> 0X54 
+| SSTORE -> 0X55 
 end
 
 let storage_inst_num (inst: storage_inst): st_num = 
 match inst with 
-| SLOAD -> (1, 1)(*Load word from the storage *)
-| SSTORE -> (2, 0) (* Save word to the storage *)
+| SLOAD -> (1, 1)
+| SSTORE -> (2, 0)
 end
 
 (*Program Counter Operation *)
@@ -301,12 +336,13 @@ type pc_inst =
 let pc_inst_opcode (inst: pc_inst): int = 
 match inst with
 | JUMP -> 0X56
-| JUMPI -> 0X57 (* Conditionally alter the program counter. *)
+| JUMPI -> 0X57
 | PC -> 0X58 
 | JUMPDEST -> 0X5b
 end
 
-let pc_inst_num (inst: pc_inst): st_num = match inst with
+let pc_inst_num (inst: pc_inst): st_num = 
+match inst with
 | JUMP -> (1, 0)
 | JUMPI -> (2, 0)
 | PC -> (0, 1)
@@ -315,13 +351,12 @@ end
 
 
 (* Stack Operations *)
-
-(* 32 PUSH operations in total *)
-(* The pushed value is represented by a list of bytes. *)
+(* The PUSH instruction to be updated*)
 
 type stack_inst =
   | POP (* Remove item from stack *)
   | PUSH machword (* pushing an element to the stack *) 
+  (* | PUSH (list byte)  *)
   | CALLDATALOAD (* push a word to the stack which is taken from the caller's data *)
 
 exception PushError
@@ -338,7 +373,8 @@ raises {PushError -> False}
 | _ -> absurd
 end
 
-let stack_inst_num (inst: stack_inst): st_num = match inst with
+let stack_inst_num (inst: stack_inst): st_num = 
+match inst with
 | POP -> (1, 0)
 | PUSH _ -> (0, 1)
 | CALLDATALOAD -> (1, 1)
@@ -427,7 +463,7 @@ let system_inst_num (inst: system_inst): st_num = match inst with
 end
 
 (* Instruction Set *)
-(* The previous operation sets above are here combined into a single type. *)
+(* The previous instruction sets above are here combined into the instruction type. *)
 
 type instruction =
   | Invalid byte
@@ -443,13 +479,6 @@ type instruction =
   | Swap swap_inst
   | Log log_inst
   | System system_inst
-
-(*let to_list m = 
-match m with
- | None -> Nil
- | Some s -> [s]
-end*)
-
 
 let inst_opcode (inst: instruction): list int = 
 match inst with
@@ -485,13 +514,7 @@ let inst_stack_num (inst: instruction): st_num = match inst with
 | System m -> system_inst_num m
 end
 
-
-
-
-
-
-(* Gas mechanism (Fee schedule) *)
-
+(* Gas mechanism *)
 
 constant g_zero: int = 0
 constant g_base: int = 2
@@ -499,7 +522,7 @@ constant g_verylow: int = 3
 constant g_low: int = 5
 constant g_mid: int = 8
 constant g_high: int = 10
-constant g_extcode: int = 700 (* Amount of gas to pay for operations of the set Wextcode *)
+constant g_extcode: int = 700 (* Amount of gas to pay for instruction of the set Wextcode *)
 
 
 let gas_of_Wzero (inst: instruction) : int =
@@ -574,30 +597,7 @@ constant g_blockhash: int = 20
 constant g_quaddivisor: int = 100
 
 
-(* TODO Move to the preprocessor part: begin *)
-(*
-
-type program = {
-  program_content : int -> option instruction; 
-  program_length  : int; (* the length of the program in bytes *)
-}
-
-let inst_list_of_program(p: program) (idx: int): byte =
-   match p.program_content idx with
-   | None -> 0
-   | Some instruction ->
-      match List.nth 0 (inst_opcode inst) with
-      | None -> 0
-      | Some a -> a
-      end
-   end
-
-
-(* Move to the preprocessor part: end *)
-*)
-
-
-(* Representation of the machine state part i.e. the volatile part *)
+(* Representation of the machine state *)
 type machine_state = {
   mac_stack : stack ; (* In EVM definition, max length is 1024 *)
   mac_memory : memory;
@@ -606,57 +606,22 @@ type machine_state = {
   mac_status : vmstatus;
   mac_memory_usage : int; (* the current memory usage *) 
   mac_gas : int; (* the remaining gas *)
-  mac_insts : list instruction;  (* Slight changes *)
-  mac_jumpmap : uint256 -> int
+  mac_insts : list instruction;  
+  mac_jumpmap : map uint256 int
 }
-
-
-
-(* The result of a program execution is the results of its instructions contained in the program *)
-
-
-
 
 
 
 (* Auxiliary functions for EVM instructions *)  
 
-(* Auxiliary functions for memory *)
-(* Memory initialization*)
-(*
-let empty_memo: memory = 
-(fun a: machword -> None)
-*)
-(*
-let rec update_memoContent (memo: memory) (idx: uint256) (cont: list memory_content) (n: int): memory 
-requires {n >= 0} 
-=   
-match n with 
-| 0 -> memo
-| m + 1 -> 
-   match cont with 
-      | Nil -> memo
-      | h :: t -> update_memoContent (fun addr -> if addr = idx then h else memo addr) (idx + 1) t m
-        end
-end
-
-let rec read_memoContent (idx: uint256) (n: int) (memo: memory): list memory_content
-    requires {n >= 0}
-= match n with 
-    | 0 -> Nil
-    | m + 1 -> memo idx :: read_memoContent (idx + 1) m memo
-  end
-*)
-let update_memory_content (m: memory) (idx: uint256) (cont: option memory_content): memory =
-   fun addr -> if addr = idx then cont else (m addr)
-
 (* Auxiliary functions for stack *)
 
 let push_stack (s: stack) (ele: machword): stack = Cons ele s
-(*
-let rec push_stack_lst (s: stack) (lst: list uint256) (idx: int): stack = 
-if idx = 0 then s else (push_stack_lst (Cons lst[0] s) (tl lst) (idx - 1))
-*)
+
+(* let rec push_stack_lst (s: stack) (lst: list machword) (idx: int): stack = 
+if idx = 0 then s 
+else (push_stack_lst (Cons lst[0] s) (tl lst) (idx - 1)) *)
+
 let pop_stack (s: stack): (stack, option machword)  = 
     match s with
     | Cons x t -> (t, Some x)
@@ -685,16 +650,16 @@ match (nth 0 s, nth (i-1) s) with
 | _, _ -> None
 end
 
+
+(* Auxiliary functions for memory *)
+let update_memory_content (m: memory) (idx: uint256) (cont: option memory_content): memory =
+   fun addr -> if addr = idx then cont else (m addr)
 (* Auxiliary functions for Storage *)
 let update_storage_from_address storage (addr: uint256) (v: uint256): storage =
-  let addr = UInt160.of_int (UInt256.to_int addr) in
-  fun (a: address) -> if a = addr then v else storage a
+  (* let addr = UInt160.of_int (UInt256.to_int addr) in *)
+ fun (a: uint256) -> if a = addr then v else storage a
 
 
-(* TODO update the concrete definition *)
-(*
-function swap_stack (s: stack) (i: int): option stack
-*)     
 
 (* Machine state update *)
 
@@ -709,28 +674,19 @@ let update_pc (pc: int) (m: machine_state) : machine_state =
 
 let update_status (vst: vmstatus) (m: machine_state) : machine_state =
 { m with mac_status = vst }  
-(* Auxiliay function for the slight change in machine state to get the opcodes *)
+
+(* Auxiliay function for the slight change in machine state to get the instructions *)
 
 let inc_pc (m: machine_state): machine_state =
   update_pc (m.mac_pc + 1) m
-(*
-type machine_state = {
-  mac_stack : stack ; (* In EVM definition, max length is 1024 *)
-  mac_memory : memory;
-  mac_pc : int;
-  mac_status : vmstatus;
-  mac_memory_usage : int; (* the current memory usage *) 
-  mac_gas : int; (* the remaining gas *)
-  mac_insts : list instruction;  (* Slight changes *)
-  mac_jumpmap : uint256 -> int
-}
-*)
+
 let get_inst (mac_st: machine_state): option instruction =
   match mac_st.mac_pc, mac_st.mac_insts with 
   | pc, insts -> (nth pc insts) 
+  | _, Nil -> None
   end
 
-(* Transformation semantics for different insturctions *)
+(* Transition effect for the insturctions *)
 
 let interpreter: machine_state -> machine_state =
    fun m -> 
@@ -930,5 +886,5 @@ let interpreter: machine_state -> machine_state =
     | _                 -> {m with mac_status = (Error InvalidOpcode)} 
     end
 
-(* MLOAD CALLDATACOPY for memory *)
+
 end
