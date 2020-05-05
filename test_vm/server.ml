@@ -33,14 +33,13 @@ let parse_contract (contract: string) : (instruction list) * (Z.t -> Z.t) =
         let opcode = get_opcode () in
         append_inst begin
             match opcode with
-            | 0x00 -> (* STOP *)
-                System STOP
-            | 0x01 -> (* ADD *)
-                Arith ADD
-            | 0x16 -> (* AND *)
-                Bits AND
-            | 0x55 -> (* SSTORE *)
-                Storage SSTORE
+            | 0x00 -> System STOP
+            | 0x01 -> Arith ADD
+            | 0x03 -> Arith SUB
+            | 0x07 -> Sarith SMOD
+            | 0x08 -> Arith ADDMOD
+            | 0x16 -> Bits AND
+            | 0x55 -> Storage SSTORE
             (* start of PUSHXXX *)
             | pushop when (0x60 <= pushop && pushop < 0x80) -> begin
                 let nwords = (pushop - 0x60 + 1) in

@@ -1,3 +1,8 @@
+(**
+ * Why3 leaves a set of unimplemented parts in the extracted codes, i.e. which number library to use
+ * for big numbers, etc. This file implements these holes.
+ *)
+
 open Big_int;;
 
 module Z = struct
@@ -7,8 +12,9 @@ module Z = struct
     let to_int = int_of_big_int
 
     let zero = of_int 0
+    let uint256_ubound = (power_big_int_positive_int (of_int 2) 256)
 
-    let add = add_big_int
+    let add a b = mod_big_int (add_big_int a b) uint256_ubound
     let sub = sub_big_int
     let mul = mult_big_int
     let div = div_big_int
@@ -45,7 +51,7 @@ module Storage = struct
 
     type t = Z.t StringMap.t
 
-    let update_storage (key: Z.t) (value: Z.t) storage : t =
+    let update_storage storage (key: Z.t) (value: Z.t) : t =
         let str_key = Z.to_bytes key in
         StringMap.add str_key value storage
 
@@ -56,8 +62,6 @@ type address = Z.t
 
 type machword = Z.t
 
-type storage = Storage.t
-
 type memory_content =
   | Item8 of Z.t
   | Item256 of Z.t
@@ -65,6 +69,8 @@ type memory_content =
 type memory = (Z.t) -> (memory_content option)
 
 type stack = (Z.t) list
+
+type storage = (Z.t) -> (Z.t)
 
 type error =
   | OutOfBounds
@@ -85,31 +91,6 @@ type vmstatus =
   | Finish of return_type
 
 type st_num = (Z.t) * (Z.t)
-
-type sign_arith_inst =
-  | SDIV
-  | SMOD
-  | SLT
-  | SGT
-  | SIGNEXTEND
-
-let sign_arith_inst_opcode (inst: sign_arith_inst) : Z.t =
-  begin match inst with
-  | SDIV -> (Z.of_int 5)
-  | SMOD -> (Z.of_int 7)
-  | SLT -> (Z.of_int 18)
-  | SGT -> (Z.of_int 19)
-  | SIGNEXTEND -> (Z.of_int 11)
-  end
-
-let sign_arith_inst_num (inst: sign_arith_inst) : (Z.t) * (Z.t) =
-  begin match inst with
-  | SDIV -> ((Z.of_int 2), (Z.of_int 1))
-  | SMOD -> ((Z.of_int 2), (Z.of_int 1))
-  | SLT -> ((Z.of_int 2), (Z.of_int 1))
-  | SGT -> ((Z.of_int 2), (Z.of_int 1))
-  | SIGNEXTEND -> ((Z.of_int 2), (Z.of_int 1))
-  end
 
 type arith_inst =
   | ADD
@@ -158,6 +139,31 @@ let arith_inst_num (inst: arith_inst) : (Z.t) * (Z.t) =
   | EQ -> ((Z.of_int 2), (Z.of_int 1))
   | ISZERO -> ((Z.of_int 1), (Z.of_int 1))
   | SHA3 -> ((Z.of_int 2), (Z.of_int 1))
+  end
+
+type sign_arith_inst =
+  | SDIV
+  | SMOD
+  | SLT
+  | SGT
+  | SIGNEXTEND
+
+let sign_arith_inst_opcode (inst: sign_arith_inst) : Z.t =
+  begin match inst with
+  | SDIV -> (Z.of_int 5)
+  | SMOD -> (Z.of_int 7)
+  | SLT -> (Z.of_int 18)
+  | SGT -> (Z.of_int 19)
+  | SIGNEXTEND -> (Z.of_int 11)
+  end
+
+let sign_arith_inst_num (inst: sign_arith_inst) : (Z.t) * (Z.t) =
+  begin match inst with
+  | SDIV -> ((Z.of_int 2), (Z.of_int 1))
+  | SMOD -> ((Z.of_int 2), (Z.of_int 1))
+  | SLT -> ((Z.of_int 2), (Z.of_int 1))
+  | SGT -> ((Z.of_int 2), (Z.of_int 1))
+  | SIGNEXTEND -> ((Z.of_int 2), (Z.of_int 1))
   end
 
 type bits_inst =
@@ -508,7 +514,7 @@ let gas_of_Wlow (inst: instruction) : Z.t =
 type machine_state = {
   mac_stack: (Z.t) list;
   mac_memory: (Z.t) -> (memory_content option);
-  mac_storage: storage;
+  mac_storage: Storage.t;
   mac_pc: Z.t;
   mac_status: vmstatus;
   mac_memory_usage: Z.t;
@@ -516,12 +522,6 @@ type machine_state = {
   mac_insts: instruction list;
   mac_jumpmap: (Z.t) -> (Z.t);
   }
-
-let update_memory_content (m: (Z.t) -> (memory_content option)) (idx: Z.t)
-                          (cont: memory_content option) : (Z.t) -> (memory_content option)
-  =
-  fun (addr: Z.t) ->
-    if Z.eq addr idx then begin cont end else begin m addr end
 
 let push_stack (s: (Z.t) list) (ele: Z.t) : (Z.t) list = ele :: s
 
@@ -557,9 +557,15 @@ let swap_stack (s: (Z.t) list) (i: Z.t) : ((Z.t) list) option =
   | (_, _) -> None
   end
 
-let update_storage_from_address (storage1: storage) (addr1: Z.t)
-                                (v: Z.t) : storage =
-  Storage.update_storage addr1 v storage1
+let update_memory_content (m: (Z.t) -> (memory_content option)) (idx: Z.t)
+                          (cont: memory_content option) : (Z.t) -> (memory_content option)
+  =
+  fun (addr: Z.t) ->
+    if Z.eq addr idx then begin cont end else begin m addr end
+
+let update_storage_from_address (storage1: (Z.t) -> (Z.t)) (addr1: Z.t)
+                                (v: Z.t) : (Z.t) -> (Z.t) =
+  fun (a: Z.t) -> if Z.eq a addr1 then begin v end else begin storage1 a end
 
 let update_stack (st: (Z.t) list) (m: machine_state) : machine_state =
   { mac_stack = st; mac_memory = (m.mac_memory); mac_storage =
@@ -590,8 +596,10 @@ let inc_pc (m: machine_state) : machine_state =
   update_pc (Z.add (m.mac_pc) (Z.of_int 1)) m
 
 let get_inst (mac_st: machine_state) : instruction option =
-  let (pc, insts) = (mac_st.mac_pc, mac_st.mac_insts) in
-  List.nth_opt insts (Z.to_int pc)
+  begin match (mac_st.mac_pc, mac_st.mac_insts) with
+  | (pc, insts) -> List.nth_opt insts (Z.to_int pc)
+  | (_, []) -> None
+  end
 
 let interpreter (m: machine_state) : machine_state =
   let inst = get_inst m in
@@ -948,11 +956,16 @@ let interpreter (m: machine_state) : machine_state =
     begin match (a13, b12) with
     | (Some aqt, Some bqt) ->
       { mac_stack = stqtqt12; mac_memory = (m.mac_memory); mac_storage =
-        (update_storage_from_address (m.mac_storage) aqt bqt); mac_pc =
+        (Storage.update_storage (m.mac_storage) aqt bqt); mac_pc =
         (Z.add (m.mac_pc) (Z.of_int 1)); mac_status = (m.mac_status);
         mac_memory_usage = (m.mac_memory_usage); mac_gas =
-        (Z.sub (m.mac_gas) (Z.of_int 20000)); mac_insts = (m.mac_insts);
-        mac_jumpmap = (m.mac_jumpmap) }
+        (Z.sub (m.mac_gas) (if
+                              (Z.eq aqt ((Z.of_int 0))) && (not (Z.eq bqt ((Z.of_int 0))))
+                              then begin (Z.of_int 20000) end
+                            else
+                            begin
+                              (Z.of_int 5000) end)); mac_insts =
+        (m.mac_insts); mac_jumpmap = (m.mac_jumpmap) }
     | (_, _) ->
       { mac_stack = (m.mac_stack); mac_memory = (m.mac_memory); mac_storage =
         (m.mac_storage); mac_pc = (Z.add (m.mac_pc) (Z.of_int 1));

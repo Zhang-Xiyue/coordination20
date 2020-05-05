@@ -809,7 +809,7 @@ let interpreter: machine_state -> machine_state =
                                             mac_storage = update_storage_from_address m.mac_storage a' b';
                                             mac_stack = st'';
                                             mac_pc = m.mac_pc + 1;
-                                            mac_gas = m.mac_gas - 20000;
+                                            mac_gas = m.mac_gas - (if a' = (UInt256.of_int 0) && b' <> (UInt256.of_int 0) then 20000 else 5000);
                                             }
                   | _, _ -> {m with
                                 mac_status = (Error OutOfStack);

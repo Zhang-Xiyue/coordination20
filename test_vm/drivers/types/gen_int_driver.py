@@ -3,7 +3,7 @@ from sys import argv
 template = """
 printer "ocaml"
 
-module uint{width}.UInt{width}
+module MinimalEVM.UInt{width}
 
   syntax type uint{width}  "Z.t"
   syntax literal uint{width} "(Z.of_int %1)"

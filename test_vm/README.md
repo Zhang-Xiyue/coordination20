@@ -18,7 +18,7 @@ to install opam and initialize it.
 
 For the users who have already installed and properly configured *opam*, use
 ```
-$ opam install why3 ocamlfind yojson
+$ opam install why3 ocamlfind yojson num
 ```
 to install the Why3 [Automated Theorem Prover](http://why3.lri.fr/).
 

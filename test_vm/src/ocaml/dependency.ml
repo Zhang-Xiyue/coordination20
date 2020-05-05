@@ -1,3 +1,8 @@
+(**
+ * Why3 leaves a set of unimplemented parts in the extracted codes, i.e. which number library to use
+ * for big numbers, etc. This file implements these holes.
+ *)
+
 open Big_int;;
 
 module Z = struct
@@ -7,8 +12,9 @@ module Z = struct
     let to_int = int_of_big_int
 
     let zero = of_int 0
+    let uint256_ubound = (power_big_int_positive_int (of_int 2) 256)
 
-    let add = add_big_int
+    let add a b = mod_big_int (add_big_int a b) uint256_ubound
     let sub = sub_big_int
     let mul = mult_big_int
     let div = div_big_int
@@ -45,7 +51,7 @@ module Storage = struct
 
     type t = Z.t StringMap.t
 
-    let update_storage (key: Z.t) (value: Z.t) storage : t =
+    let update_storage storage (key: Z.t) (value: Z.t) : t =
         let str_key = Z.to_bytes key in
         StringMap.add str_key value storage
 
