@@ -15,8 +15,8 @@ module Z = struct
     let uint256_ubound = (power_big_int_positive_int (of_int 2) 256)
 
     let add a b = mod_big_int (add_big_int a b) uint256_ubound
-    let sub = sub_big_int
-    let mul = mult_big_int
+    let sub a b = mod_big_int (sub_big_int a b) uint256_ubound
+    let mul a b = mod_big_int (mult_big_int a b) uint256_ubound
     let div = div_big_int
     let ediv = div
 
@@ -636,8 +636,9 @@ let interpreter (m: machine_state) : machine_state =
       { mac_stack = (push_stack stqtqt1 (Z.mul aqt bqt)); mac_memory =
         (m.mac_memory); mac_storage = (m.mac_storage); mac_pc =
         (Z.add (m.mac_pc) (Z.of_int 1)); mac_status = (m.mac_status);
-        mac_memory_usage = (m.mac_memory_usage); mac_gas = (m.mac_gas);
-        mac_insts = (m.mac_insts); mac_jumpmap = (m.mac_jumpmap) }
+        mac_memory_usage = (m.mac_memory_usage); mac_gas =
+        (Z.sub (m.mac_gas) (Z.of_int 5)); mac_insts = (m.mac_insts);
+        mac_jumpmap = (m.mac_jumpmap) }
     | (_, _) ->
       { mac_stack = (m.mac_stack); mac_memory = (m.mac_memory); mac_storage =
         (m.mac_storage); mac_pc = (Z.add (m.mac_pc) (Z.of_int 1));
@@ -653,8 +654,9 @@ let interpreter (m: machine_state) : machine_state =
       { mac_stack = (push_stack stqtqt2 (Z.sub aqt bqt)); mac_memory =
         (m.mac_memory); mac_storage = (m.mac_storage); mac_pc =
         (Z.add (m.mac_pc) (Z.of_int 1)); mac_status = (m.mac_status);
-        mac_memory_usage = (m.mac_memory_usage); mac_gas = (m.mac_gas);
-        mac_insts = (m.mac_insts); mac_jumpmap = (m.mac_jumpmap) }
+        mac_memory_usage = (m.mac_memory_usage); mac_gas =
+        (Z.sub (m.mac_gas) (Z.of_int 3)); mac_insts = (m.mac_insts);
+        mac_jumpmap = (m.mac_jumpmap) }
     | (_, _) ->
       { mac_stack = (m.mac_stack); mac_memory = (m.mac_memory); mac_storage =
         (m.mac_storage); mac_pc = (Z.add (m.mac_pc) (Z.of_int 1));
@@ -851,8 +853,8 @@ let interpreter (m: machine_state) : machine_state =
           mac_memory = (m.mac_memory); mac_storage = (m.mac_storage);
           mac_pc = (Z.add (m.mac_pc) (Z.of_int 1)); mac_status =
           (m.mac_status); mac_memory_usage = (m.mac_memory_usage); mac_gas =
-          (m.mac_gas); mac_insts = (m.mac_insts); mac_jumpmap =
-          (m.mac_jumpmap) } end
+          (Z.sub (m.mac_gas) (Z.of_int 8)); mac_insts = (m.mac_insts);
+          mac_jumpmap = (m.mac_jumpmap) } end
     | (_, _, _) ->
       { mac_stack = (m.mac_stack); mac_memory = (m.mac_memory); mac_storage =
         (m.mac_storage); mac_pc = (Z.add (m.mac_pc) (Z.of_int 1));

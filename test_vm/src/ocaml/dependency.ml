@@ -15,8 +15,8 @@ module Z = struct
     let uint256_ubound = (power_big_int_positive_int (of_int 2) 256)
 
     let add a b = mod_big_int (add_big_int a b) uint256_ubound
-    let sub = sub_big_int
-    let mul = mult_big_int
+    let sub a b = mod_big_int (sub_big_int a b) uint256_ubound
+    let mul a b = mod_big_int (mult_big_int a b) uint256_ubound
     let div = div_big_int
     let ediv = div
 

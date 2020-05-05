@@ -706,13 +706,21 @@ let interpreter: machine_state -> machine_state =
     | Some (Arith MUL) -> let (st', a) = (pop_stack (m.mac_stack)) in 
                    let (st'', b) = ( pop_stack st') in 
                    match a, b with 
-                   | Some a', Some b' -> {m with mac_stack = push_stack st'' (a' * b'); mac_pc = m.mac_pc + 1}
+                   | Some a', Some b' -> {
+                       m with mac_stack = push_stack st'' (a' * b');
+                       mac_pc = m.mac_pc + 1;
+                       mac_gas = m.mac_gas - 5;
+                       }
                    | _, _ -> {m with mac_status = (Error OutOfStack); mac_pc = m.mac_pc + 1}
                    end
     | Some (Arith SUB) -> let (st', a) = (pop_stack (m.mac_stack)) in 
                    let (st'', b) = (pop_stack st') in 
                    match a, b with 
-                   | Some a', Some b' -> {m with mac_stack = push_stack st'' (a' - b'); mac_pc = m.mac_pc + 1 }
+                   | Some a', Some b' -> {
+                       m with mac_stack = push_stack st'' (a' - b');
+                       mac_pc = m.mac_pc + 1;
+                       mac_gas = m.mac_gas - 3;
+                       }
                    | _, _ -> {m with mac_status = (Error OutOfStack); mac_pc = m.mac_pc + 1}
                    end
 
@@ -770,7 +778,11 @@ let interpreter: machine_state -> machine_state =
                                             let _b = UInt256.to_int b' in
                                             let _c = UInt256.to_int c' in 
                                             if _c = 0 then {m with mac_stack = push_stack st''' (UInt256.of_int 0); mac_pc = m.mac_pc + 1}
-                   else {m with mac_stack = push_stack st''' (UInt256.of_int ( mod (_a + _b) _c)); mac_pc = m.mac_pc + 1}
+                   else {m with
+                       mac_stack = push_stack st''' (UInt256.of_int ( mod (_a + _b) _c));
+                       mac_pc = m.mac_pc + 1;
+                       mac_gas = m.mac_gas - 8;
+                       }
                    | _, _, _ -> {m with mac_status = (Error OutOfStack); mac_pc = m.mac_pc + 1}
                    end  
     | Some (Arith MULMOD) -> let (st', a) = (pop_stack (m.mac_stack)) in 

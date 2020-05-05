@@ -35,6 +35,7 @@ let parse_contract (contract: string) : (instruction list) * (Z.t -> Z.t) =
             match opcode with
             | 0x00 -> System STOP
             | 0x01 -> Arith ADD
+            | 0x02 -> Arith MUL
             | 0x03 -> Arith SUB
             | 0x07 -> Sarith SMOD
             | 0x08 -> Arith ADDMOD
